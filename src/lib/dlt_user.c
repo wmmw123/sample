@@ -4835,9 +4835,13 @@ void *dlt_user_housekeeperthread_function(void *ptr)
 #endif
 
 #ifdef DLT_USE_PTHREAD_SETNAME_NP
+#  if defined(__APPLE__)
+    if (pthread_setname_np("dlt_housekeeper"))
+#  else
     if (pthread_setname_np(dlt_housekeeperthread_handle, "dlt_housekeeper"))
+#  endif
         dlt_log(LOG_WARNING, "Failed to rename housekeeper thread!\n");
-#elif linux
+#elif defined(linux)
     if (prctl(PR_SET_NAME, "dlt_housekeeper", 0, 0, 0) < 0)
         dlt_log(LOG_WARNING, "Failed to rename housekeeper thread!\n");
 #endif
@@ -5107,7 +5111,7 @@ DltReturnValue dlt_user_log_send_log(DltContextData *log, const int mtype, int *
             }
 
             dlt_vlog(LOG_DEBUG, "%s: Current file size=[%lld]\n", __func__,
-                     (long long int)st.st_size);
+                     (long long)st.st_size);
             /* Check filesize */
             /* Return error if the file size has reached to maximum */
             unsigned int msg_size = (unsigned int)st.st_size + (unsigned int)msg.headersize +
@@ -5116,7 +5120,7 @@ DltReturnValue dlt_user_log_send_log(DltContextData *log, const int mtype, int *
                 dlt_user_file_reach_max = true;
                 dlt_vlog(LOG_ERR,
                          "%s: File size (%lld bytes) reached to defined maximum size (%d bytes)\n",
-                         __func__, (long long int)st.st_size, dlt_user.filesize_max);
+                         __func__, (long long)st.st_size, dlt_user.filesize_max);
                 dlt_mutex_unlock();
                 return DLT_RETURN_FILESZERR;
             }
@@ -5613,12 +5617,12 @@ DltReturnValue dlt_user_log_send_log_v2(DltContextData *log, const int mtype, Dl
             }
 
             dlt_vlog(LOG_DEBUG, "%s: Current file size=[%lld]\n", __func__,
-                     (long long int)st.st_size);
+                     (long long)st.st_size);
             /* Check filesize */
             /* Return error if the file size has reached to maximum */
             unsigned int msg_size = 0;
-            if (st.st_size < 0 || (uintmax_t)st.st_size > UINT_MAX) {
-                dlt_vlog(LOG_ERR, "%s: File size (%lld bytes) is invalid or too large for unsigned int\n", __func__, (long long int)st.st_size);
+            if (st.st_size < 0 || st.st_size > UINT_MAX) {
+                dlt_vlog(LOG_ERR, "%s: File size (%lld bytes) is invalid or too large for unsigned int\n", __func__, (long long)st.st_size);
                 return DLT_RETURN_FILESZERR;
             }
             msg_size = (unsigned int)st.st_size + (unsigned int) msg.headersizev2 + (unsigned int) log->size;
@@ -5626,7 +5630,7 @@ DltReturnValue dlt_user_log_send_log_v2(DltContextData *log, const int mtype, Dl
                 dlt_user_file_reach_max = true;
                 dlt_vlog(LOG_ERR,
                          "%s: File size (%lld bytes) reached to defined maximum size (%d bytes)\n",
-                         __func__, (long long int)st.st_size, dlt_user.filesize_max);
+                         __func__, (long long)st.st_size, dlt_user.filesize_max);
                 return DLT_RETURN_FILESZERR;
             }
             else {
@@ -7362,7 +7366,9 @@ int dlt_start_threads()
      */
     pthread_condattr_t attr;
     pthread_condattr_init(&attr);
+#if !defined(__APPLE__)
     pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
+#endif
     pthread_cond_init(&dlt_housekeeper_running_cond, &attr);
 
     if (pthread_create(&(dlt_housekeeperthread_handle),
