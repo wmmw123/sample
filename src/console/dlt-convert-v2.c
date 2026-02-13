@@ -366,7 +366,9 @@ static void empty_dir(const char *dir)
                     /* Validate filename to prevent path traversal */
                     if (strstr(files[i]->d_name, "/") == NULL &&
                         strstr(files[i]->d_name, "..") == NULL) {
-                        snprintf(tmp_filename, FILENAME_SIZE, "%s%s",
+                        /* Limit d_name to 993 chars to guarantee the result fits in
+                         * FILENAME_SIZE (1024) together with the 30-char prefix and NUL. */
+                        snprintf(tmp_filename, FILENAME_SIZE, "%s%.993s",
                                  dir, files[i]->d_name);
                         if (remove(tmp_filename) != 0)
                             fprintf(stderr, "ERROR: Failed to delete %s: %s\n",
@@ -643,7 +645,9 @@ int main(int argc, char *argv[])
     for (index = optind; index < argc; index++) {
         if (tflag) {
             memset(tmp_filename, 0, FILENAME_SIZE);
-            snprintf(tmp_filename, FILENAME_SIZE, "%s%s",
+            /* Limit d_name to 993 chars to guarantee the result fits in
+             * FILENAME_SIZE (1024) together with the 30-char prefix and NUL. */
+            snprintf(tmp_filename, FILENAME_SIZE, "%s%.993s",
                      DLT_CONVERT_V2_WS, files[index - optind + 2]->d_name);
             argv[index] = tmp_filename;
         }
