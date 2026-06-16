@@ -14,6 +14,7 @@
 #######
 
 # Set minimum Cmake version and setup policy behavior
+cmake_minimum_required(VERSION 3.10.2)
 project(automotive-dlt VERSION 3.0.1)
 
 
