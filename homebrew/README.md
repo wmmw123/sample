@@ -2,11 +2,13 @@
 
 Homebrew tap for the COVESA DLT daemon.
 
+The formula lives at [`Formula/dlt-daemon.rb`](../Formula/dlt-daemon.rb) in the repository root, which is where Homebrew expects it when using this repo as a tap.
+
 ## Install
 
 ```sh
-brew tap COVESA/dlt-daemon
-brew install dlt-daemon
+brew tap COVESA/dlt-daemon https://github.com/COVESA/dlt-daemon
+brew install COVESA/dlt-daemon/dlt-daemon
 ```
 
 ## What gets installed
