@@ -2815,9 +2815,11 @@ int dlt_daemon_control_message_unregister_context_v2(int sock,
                                                   int verbose)
 {
     DltMessageV2 msg;
-    /* Zero-initialise the entire response struct so apidlen / ctidlen
-     * cannot leak uninitialised stack memory to the wire (see #867 / #866). */
+    /* Zero-initialise so apidlen/ctidlen never leak uninitialised stack
+     * memory to the wire (#867). */
     DltServiceUnregisterContextV2 resp = {0};
+    char apid_buf[DLT_V2_ID_SIZE] = {0};
+    char ctid_buf[DLT_V2_ID_SIZE] = {0};
     int offset = 0;
 
     PRINT_FUNCTION_VERBOSE(verbose);
@@ -2829,27 +2831,26 @@ int dlt_daemon_control_message_unregister_context_v2(int sock,
     if (dlt_message_init_v2(&msg, 0) == DLT_RETURN_ERROR)
         return -1;
 
-    /* Populate response fields from the function parameters. The
-     * DltServiceUnregisterContextV2 struct uses `char *` for apid / ctid;
-     * point them at the caller-supplied buffers (which outlive this call).
-     * Previously these fields were left NULL while dlt_set_id_v2() was
-     * called with the NULL destination, which is a no-op — the apid /
-     * ctid bytes were never copied into the response. resp.apidlen and
-     * resp.ctidlen were also never assigned, so the subsequent memcpy of
-     * &(resp.apidlen) / &(resp.ctidlen) wrote uninitialised stack memory
-     * to the wire. See #866 for context on the broader pattern. */
+    /* Build the response, copying the ids through the shared dlt_set_id_v2()
+     * helper into local buffers rather than assigning raw pointers. The
+     * struct's apid/ctid are char *, so the previous dlt_set_id_v2(resp.apid,
+     * ...) call ran against a NULL destination and never copied anything. */
     resp.service_id = DLT_SERVICE_ID_UNREGISTER_CONTEXT;
     resp.status     = DLT_SERVICE_RESPONSE_OK;
     resp.apidlen    = apidlen;
-    resp.apid       = apid;
     resp.ctidlen    = ctidlen;
-    resp.ctid       = ctid;
+    if (apidlen > 0) {
+        dlt_set_id_v2(apid_buf, apid, apidlen);
+        resp.apid = apid_buf;
+    }
+    if (ctidlen > 0) {
+        dlt_set_id_v2(ctid_buf, ctid, ctidlen);
+        resp.ctid = ctid_buf;
+    }
     dlt_set_id(resp.comid, comid);
 
-    /* prepare payload of data — use a wider type so the size calculation
-     * cannot overflow when apidlen + ctidlen approach their uint8_t maxima.
-     * Previously a (uint8_t) cast wrapped mod 256, underallocating
-     * msg.databuffer and corrupting the heap on the memcpy chain below. */
+    /* Wider type so the size sum cannot wrap mod 256 (a uint8_t cast here
+     * previously underallocated msg.databuffer and corrupted the heap). */
     uint32_t contextSize = (uint32_t)sizeof(uint32_t) + (uint32_t)sizeof(uint8_t)
                          + (uint32_t)sizeof(uint8_t) + (uint32_t)apidlen
                          + (uint32_t)sizeof(uint8_t) + (uint32_t)ctidlen
