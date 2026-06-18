@@ -3666,6 +3666,8 @@ void dlt_daemon_control_set_log_level_v2(int sock,
     PRINT_FUNCTION_VERBOSE(verbose);
     char *apid =NULL;
     char *ctid =NULL;
+    char apid_buf[DLT_V2_ID_SIZE] = {0};
+    char ctid_buf[DLT_V2_ID_SIZE] = {0};
     DltServiceSetLogLevelV2 req = {0};
     DltDaemonContext *context = NULL;
     int8_t apid_length = 0;
@@ -3683,12 +3685,15 @@ void dlt_daemon_control_set_log_level_v2(int sock,
     memcpy(&(req.apidlen), msg->databuffer + offset, sizeof(uint8_t));
     offset = offset + (int)sizeof(uint8_t);
 
-    /* Point req.apid into msg->databuffer when apidlen > 0; leave NULL
-     * otherwise. The previous dlt_set_id_v2(req.apid, ...) call was a
-     * no-op because req.apid is a zero-initialised NULL char *.
-     * See #863 for full analysis. */
+    /* Copy the variable-length apid into a local fixed-size buffer through the
+     * dlt_set_id_v2() helper. req.apid is a NULL char * in the zero-initialised
+     * request struct, so the previous dlt_set_id_v2(req.apid, ...) call was a
+     * silent no-op that left req.apid NULL and crashed the daemon downstream.
+     * Giving the helper a real destination keeps id initialisation inside the
+     * shared API rather than hand-parsing the wire buffer. See #863. */
     if (req.apidlen > 0) {
-        req.apid = (char *)(msg->databuffer + offset);
+        dlt_set_id_v2(apid_buf, (const char *)(msg->databuffer + offset), req.apidlen);
+        req.apid = apid_buf;
         offset = offset + req.apidlen;
     }
 
@@ -3696,7 +3701,8 @@ void dlt_daemon_control_set_log_level_v2(int sock,
     offset = offset + (int)sizeof(uint8_t);
 
     if (req.ctidlen > 0) {
-        req.ctid = (char *)(msg->databuffer + offset);
+        dlt_set_id_v2(ctid_buf, (const char *)(msg->databuffer + offset), req.ctidlen);
+        req.ctid = ctid_buf;
         offset = offset + req.ctidlen;
     }
     memcpy(&(req.log_level), msg->databuffer + offset, sizeof(uint8_t));
@@ -3706,10 +3712,9 @@ void dlt_daemon_control_set_log_level_v2(int sock,
     if (daemon_local->flags.enforceContextLLAndTS)
         req.log_level = (uint8_t) getStatus(req.log_level, daemon_local->flags.contextLogLevel);
 
-    /* The earlier dlt_set_id_v2(apid, req.apid, ...) call was a no-op
-     * because the local apid (declared NULL above) was passed as the
-     * destination. With req.apid now correctly assigned, point the
-     * local pointer at it. Same for ctid. */
+    /* req.apid / req.ctid now reference the local buffers (or stay NULL when
+     * the corresponding length is zero), so the local pointers used by the
+     * lookup logic below can simply alias them. */
     apid = req.apid;
     apid_length = (int8_t) req.apidlen;
     ctid = req.ctid;
