@@ -545,7 +545,7 @@ DltReturnValue dlt_init(void)
 
     /* Check logging mode and internal log file is opened or not*/
     if (logging_mode == DLT_LOG_TO_FILE && logging_handle == NULL) {
-        dlt_log_init(logging_mode);
+        dlt_log_init((int)logging_mode);
     }
 
     /* Initialize common part of dlt_init()/dlt_init_file() */
@@ -2388,14 +2388,14 @@ DltReturnValue dlt_set_application_ll_ts_limit(DltLogLevelType loglevel, DltTrac
 
     /* Update local structures */
     for (i = 0; i < dlt_user.dlt_ll_ts_num_entries; i++) {
-        dlt_user.dlt_ll_ts[i].log_level = loglevel;
-        dlt_user.dlt_ll_ts[i].trace_status = tracestatus;
+        dlt_user.dlt_ll_ts[i].log_level = (int8_t)loglevel;
+        dlt_user.dlt_ll_ts[i].trace_status = (int8_t)tracestatus;
 
         if (dlt_user.dlt_ll_ts[i].log_level_ptr)
-            *(dlt_user.dlt_ll_ts[i].log_level_ptr) = loglevel;
+            *(dlt_user.dlt_ll_ts[i].log_level_ptr) = (int8_t)loglevel;
 
         if (dlt_user.dlt_ll_ts[i].trace_status_ptr)
-            *(dlt_user.dlt_ll_ts[i].trace_status_ptr) = tracestatus;
+            *(dlt_user.dlt_ll_ts[i].trace_status_ptr) = (int8_t)tracestatus;
     }
 
     dlt_mutex_unlock();
@@ -2410,7 +2410,7 @@ DltReturnValue dlt_set_application_ll_ts_limit(DltLogLevelType loglevel, DltTrac
     }
 }
 
-int dlt_get_log_state()
+int dlt_get_log_state(void)
 {
     return dlt_user.log_state;
 }
@@ -2497,25 +2497,6 @@ DltReturnValue dlt_user_log_write_start_init(DltContext *handle,
     return DLT_RETURN_TRUE;
 }
 
-static DltReturnValue dlt_user_log_write_start_internal(DltContext *handle,
-                                                        DltContextData *log,
-                                                        DltLogLevelType loglevel,
-                                                        uint32_t messageid,
-                                                        bool is_verbose);
-
-inline DltReturnValue dlt_user_log_write_start(DltContext *handle, DltContextData *log, DltLogLevelType loglevel)
-{
-    return dlt_user_log_write_start_internal(handle, log, loglevel, DLT_USER_DEFAULT_MSGID, true);
-}
-
-DltReturnValue dlt_user_log_write_start_id(DltContext *handle,
-                                           DltContextData *log,
-                                           DltLogLevelType loglevel,
-                                           uint32_t messageid)
-{
-    return dlt_user_log_write_start_internal(handle, log, loglevel, messageid, false);
-}
-
 DltReturnValue dlt_user_log_write_start_internal(DltContext *handle,
                                            DltContextData *log,
                                            DltLogLevelType loglevel,
@@ -2582,6 +2563,19 @@ DltReturnValue dlt_user_log_write_start_internal(DltContext *handle,
     }
 
     return ret;
+}
+
+inline DltReturnValue dlt_user_log_write_start(DltContext *handle, DltContextData *log, DltLogLevelType loglevel)
+{
+    return dlt_user_log_write_start_internal(handle, log, loglevel, DLT_USER_DEFAULT_MSGID, true);
+}
+
+DltReturnValue dlt_user_log_write_start_id(DltContext *handle,
+                                           DltContextData *log,
+                                           DltLogLevelType loglevel,
+                                           uint32_t messageid)
+{
+    return dlt_user_log_write_start_internal(handle, log, loglevel, messageid, false);
 }
 
 DltReturnValue dlt_user_log_write_start_w_given_buffer(DltContext *handle,
@@ -3743,7 +3737,7 @@ DltReturnValue dlt_user_trace_network_segmented_start(uint32_t *id,
         }
 
         log.args_num = 0;
-        log.trace_status = nw_trace_type;
+        log.trace_status = (int32_t)nw_trace_type;
         log.size = 0;
 
         gettimeofday(&tv, NULL);
@@ -3845,7 +3839,7 @@ DltReturnValue dlt_user_trace_network_segmented_segment(uint32_t id,
         }
 
         log.args_num = 0;
-        log.trace_status = nw_trace_type;
+        log.trace_status = (int32_t)nw_trace_type;
         log.size = 0;
 
         /* Write identifier */
@@ -3914,7 +3908,7 @@ DltReturnValue dlt_user_trace_network_segmented_end(uint32_t id, DltContext *han
         }
 
         log.args_num = 0;
-        log.trace_status = nw_trace_type;
+        log.trace_status = (int32_t)nw_trace_type;
         log.size = 0;
 
         /* Write identifier */
@@ -4181,7 +4175,7 @@ DltReturnValue dlt_user_trace_network_truncated(DltContext *handle,
         }
 
         log.args_num = 0;
-        log.trace_status = nw_trace_type;
+        log.trace_status = (int32_t)nw_trace_type;
         log.size = 0;
 
         if (header == NULL)
@@ -4553,7 +4547,7 @@ DltReturnValue dlt_log_raw_v2(DltContext *handle, DltLogLevelType loglevel, void
     return DLT_RETURN_OK;
 }
 
-DltReturnValue dlt_log_marker()
+DltReturnValue dlt_log_marker(void)
 {
     if (!DLT_USER_INITIALIZED) {
         if (dlt_init() < DLT_RETURN_OK) {
@@ -6302,8 +6296,8 @@ DltReturnValue dlt_send_app_ll_ts_limit(const char *apid, DltLogLevelType loglev
 
     /* set usercontext */
     dlt_set_id(usercontext.apid, apid);       /* application id */
-    usercontext.log_level = loglevel;
-    usercontext.trace_status = tracestatus;
+    usercontext.log_level = (uint8_t)loglevel;
+    usercontext.trace_status = (uint8_t)tracestatus;
 
     if (dlt_user.dlt_is_file)
         return DLT_RETURN_OK;
@@ -6357,8 +6351,8 @@ DltReturnValue dlt_send_app_ll_ts_limit_v2(const char *apid, DltLogLevelType log
     }
     usercontext.apidlen = (uint8_t)apidlen_sz;
     dlt_set_id_v2(usercontext.apid, apid, usercontext.apidlen); /* application id */
-    usercontext.log_level = loglevel;
-    usercontext.trace_status = tracestatus;
+    usercontext.log_level = (uint8_t)loglevel;
+    usercontext.trace_status = (uint8_t)tracestatus;
 
     size_t buffersize = sizeof(uint8_t) + usercontext.apidlen + sizeof(uint8_t) + sizeof(uint8_t);
     uint8_t buffer[DLT_ID_SIZE + 3];
@@ -6438,7 +6432,7 @@ DltReturnValue dlt_user_log_send_log_mode(DltUserLogMode mode, uint8_t version)
     return DLT_RETURN_OK;
 }
 
-DltReturnValue dlt_user_log_send_marker()
+DltReturnValue dlt_user_log_send_marker(void)
 {
     DltUserHeader userheader;
     DltReturnValue ret;
@@ -7352,7 +7346,7 @@ void dlt_user_test_corrupt_message_size(int enable, int16_t size)
 #endif
 
 
-int dlt_start_threads()
+int dlt_start_threads(void)
 {
     struct timespec time_to_wait, single_wait;
     struct timespec now;
@@ -7443,7 +7437,7 @@ int dlt_start_threads()
     return 0;
 }
 
-void dlt_stop_threads()
+void dlt_stop_threads(void)
 {
     int dlt_housekeeperthread_result = 0;
     int joined = 0;
@@ -7515,7 +7509,7 @@ void dlt_stop_threads()
 #endif /* DLT_NETWORK_TRACE_ENABLE */
 }
 
-static void dlt_fork_child_fork_handler()
+static void dlt_fork_child_fork_handler(void)
 {
     g_dlt_is_child = 1;
     dlt_user_init_state = INIT_UNITIALIZED;
