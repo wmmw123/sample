@@ -2145,18 +2145,54 @@ void dlt_daemon_control_get_log_info_v2(int sock,
 
     /* prepare pointer to message request */
     int db_offset = 0;
+    char apid_buf[DLT_V2_ID_SIZE] = {0};
+    char ctid_buf[DLT_V2_ID_SIZE] = {0};
     memcpy(&(req->service_id), msg->databuffer + db_offset, sizeof(uint32_t));
     db_offset = db_offset + (int)sizeof(uint32_t);
     memcpy(&(req->options), msg->databuffer + db_offset, sizeof(uint8_t));
     db_offset = db_offset + (int)sizeof(uint8_t);
     memcpy(&(req->apidlen), msg->databuffer + db_offset, sizeof(uint8_t));
     db_offset = db_offset + (int)sizeof(uint8_t);
-    dlt_set_id_v2(req->apid, (const char *)(msg->databuffer + db_offset), req->apidlen);
-    db_offset = db_offset + (int)req->apidlen;
+
+    /* apidlen and ctidlen are attacker-controlled (uint8_t each, up to 255).
+     * The fixed-size precheck at the top of this function only validates
+     * the empty case (apidlen = ctidlen = 0); before reading the
+     * variable-length apid (apidlen bytes) followed by ctidlen (1 byte),
+     * confirm the message is large enough to contain them. Otherwise
+     * dlt_set_id_v2() reads past msg->databuffer. */
+    if ((db_offset + (int)req->apidlen + (int)sizeof(uint8_t)) > msg->datasize) {
+        free(req);
+        return;
+    }
+
+    /* Copy the variable-length apid into a local fixed-size buffer through the
+     * dlt_set_id_v2() helper, then point req->apid at it. req->apid is a
+     * calloc'd char * (NULL), so the previous dlt_set_id_v2(req->apid, ...)
+     * call here was a no-op: req->apid stayed NULL and was later passed to
+     * dlt_daemon_application_find_v2() despite req->apidlen being non-zero,
+     * silently turning every non-empty apid lookup into a zero-length one.
+     * Giving the helper a real destination keeps id initialisation inside the
+     * shared API rather than hand-parsing the wire buffer. See #870. */
+    if (req->apidlen > 0) {
+        dlt_set_id_v2(apid_buf, (const char *)(msg->databuffer + db_offset), req->apidlen);
+        req->apid = apid_buf;
+        db_offset = db_offset + (int)req->apidlen;
+    }
     memcpy(&(req->ctidlen), (const char *)(msg->databuffer + db_offset), sizeof(uint8_t));
     db_offset = db_offset + (int)sizeof(uint8_t);
-    dlt_set_id_v2(req->ctid, (const char *)(msg->databuffer + db_offset), req->ctidlen);
-    db_offset = db_offset + (int)req->ctidlen;
+
+    /* Same check for ctid (ctidlen bytes) and the trailing com field
+     * (DLT_ID_SIZE bytes). */
+    if ((db_offset + (int)req->ctidlen + DLT_ID_SIZE) > msg->datasize) {
+        free(req);
+        return;
+    }
+
+    if (req->ctidlen > 0) {
+        dlt_set_id_v2(ctid_buf, (const char *)(msg->databuffer + db_offset), req->ctidlen);
+        req->ctid = ctid_buf;
+        db_offset = db_offset + (int)req->ctidlen;
+    }
     memcpy((req->com), (const char *)(msg->databuffer + db_offset), DLT_ID_SIZE);
 
     /* initialise new message */
