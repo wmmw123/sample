@@ -845,8 +845,6 @@ DltReturnValue dlt_init_common(void)
     dlt_user.dlt_user_handle = DLT_FD_INIT;
 
     dlt_set_id(dlt_user.ecuID, DLT_USER_DEFAULT_ECU_ID);
-    dlt_user.ecuID2len = strlen(DLT_USER_DEFAULT_ECU_ID);
-    dlt_set_id_v2(dlt_user.ecuID2, DLT_USER_DEFAULT_ECU_ID, dlt_user.ecuID2len);
     dlt_set_id(dlt_user.appID, "");
     dlt_user.appID2len = 0;
     memset(dlt_user.appID2, 0, DLT_V2_ID_SIZE);
